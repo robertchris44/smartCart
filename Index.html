@@ -1,1 +1,1555 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#059669" />
+  <title>SmartCart v6 — Meal & Budget Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .animate-slide-up { animation: slideUp 0.22s ease-out forwards; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 pb-28 font-sans">
+
+  <!-- Warning banner if opened in a restricted file-viewer that blocks JS -->
+  <div id="js-warning" class="bg-amber-500 text-white text-xs font-bold px-4 py-2.5 text-center">
+    ⚠️ JavaScript is disabled in this viewer. Tap the menu (⋮) and choose "Open in Chrome" so buttons work!
+  </div>
+
+  <!-- Sticky Budget Header -->
+  <header id="budget-bar" class="sticky top-0 z-40 bg-emerald-600 text-white shadow-md transition-colors duration-300">
+    <div class="max-w-lg mx-auto px-4 py-3">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="font-bold text-lg tracking-tight flex items-center gap-1.5">
+            <span>SmartCart</span>
+            <span class="text-[10px] font-extrabold uppercase tracking-wider bg-black/20 px-1.5 py-0.5 rounded">v6</span>
+          </h1>
+          <p id="store-badge" class="text-xs text-emerald-100">Food Lion (0.92x avg)</p>
+        </div>
+        <div class="text-right">
+          <div class="text-[10px] uppercase tracking-wider opacity-85">Cart Total / Budget</div>
+          <div class="font-extrabold text-xl leading-tight">
+            $<span id="total-cost">0.00</span> <span class="text-sm font-normal opacity-90">/ $<span id="display-budget">150</span></span>
+          </div>
+          <div class="flex items-center justify-end gap-2 text-[11px] font-semibold text-emerald-100">
+            <span id="remaining-badge">$150.00 remaining</span>
+            <span class="opacity-60">•</span>
+            <span id="cost-per-meal-badge">$0.00/meal</span>
+          </div>
+        </div>
+      </div>
+      <!-- Unpriced Items Notice in Header -->
+      <div id="unpriced-header-banner" class="hidden mt-1.5 text-[11px] font-semibold bg-amber-500/90 text-white px-2.5 py-1 rounded-lg flex justify-between items-center">
+        <span id="unpriced-header-text">1 item needs a price ($0.00 assumed)</span>
+        <span class="text-[10px] uppercase tracking-wider opacity-90">Tap to set</span>
+      </div>
+      <!-- Progress Bar -->
+      <div class="w-full bg-black/20 h-1.5 rounded-full mt-2 overflow-hidden">
+        <div id="budget-progress" class="bg-white h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-lg mx-auto px-4 pt-4 space-y-4">
+
+    <!-- 1. Store, Budget & Dietary Filters -->
+    <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3.5">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grocery Store</label>
+          <select id="store-select" class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            <option value="0.88" data-name="Aldi / Lidl">Aldi / Lidl (0.88x)</option>
+            <option value="0.92" data-name="Food Lion" selected>Food Lion (0.92x)</option>
+            <option value="0.95" data-name="Walmart">Walmart (0.95x)</option>
+            <option value="1.00" data-name="Kroger / Target">Kroger / Target (1.00x)</option>
+            <option value="1.12" data-name="Publix">Publix (1.12x)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Max Budget ($)</label>
+          <input type="number" id="budget-input" value="150" min="10" step="5"
+            class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+      </div>
+
+      <div>
+        <div class="flex justify-between items-center mb-1.5">
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Dietary & Allergy Filters</label>
+          <button type="button" id="backup-btn" class="text-[11px] font-semibold text-emerald-700 hover:underline">Backup / Restore</button>
+        </div>
+        <div class="flex flex-wrap gap-1.5" id="allergy-filters">
+          <button type="button" data-allergy="gluten" class="allergy-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-300 bg-white text-slate-600 transition">Gluten-Free</button>
+          <button type="button" data-allergy="dairy" class="allergy-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-300 bg-white text-slate-600 transition">Dairy-Free</button>
+          <button type="button" data-allergy="treenut" class="allergy-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-300 bg-white text-slate-600 transition">Tree Nut-Free</button>
+          <button type="button" data-allergy="shellfish" class="allergy-btn px-2.5 py-1 rounded-full text-xs font-semibold border border-slate-300 bg-white text-slate-600 transition">Shellfish-Free</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Smart Meal Builder & Planner -->
+    <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3.5">
+      <div class="flex justify-between items-start gap-2">
+        <div>
+          <h2 class="font-bold text-base text-slate-800">1. Meal Builder</h2>
+          <p class="text-xs text-slate-500">Build any meal with auto-priced ingredients, or customize items.</p>
+        </div>
+        <button type="button" id="auto-fill-btn" class="shrink-0 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-sm transition">
+          ✨ Auto-Plan
+        </button>
+      </div>
+
+      <!-- Smart Meal Creator -->
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">+ Build New Meal</span>
+          <span class="text-[11px] text-slate-400">Smart ingredient & price match</span>
+        </div>
+        <form id="build-meal-form" class="space-y-2">
+          <div class="flex gap-2">
+            <input type="text" id="new-meal-name" placeholder="e.g. Tacos, Meatloaf, Shrimp & Rice, Chili..."
+              class="flex-1 min-w-0 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <button type="submit" class="bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-bold px-4 py-2 rounded-xl transition shrink-0">
+              Create
+            </button>
+          </div>
+          <!-- Quick Meal Idea Chips -->
+          <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pt-0.5">
+            <span class="text-[10px] font-semibold text-slate-400 shrink-0">Quick start:</span>
+            <button type="button" class="quick-idea-chip shrink-0 text-[11px] font-semibold bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 px-2.5 py-0.5 rounded-full" data-idea="Tacos">🌮 Tacos</button>
+            <button type="button" class="quick-idea-chip shrink-0 text-[11px] font-semibold bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 px-2.5 py-0.5 rounded-full" data-idea="Spaghetti & Meatballs">🍝 Spaghetti</button>
+            <button type="button" class="quick-idea-chip shrink-0 text-[11px] font-semibold bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 px-2.5 py-0.5 rounded-full" data-idea="Burgers & Fries">🍔 Burgers</button>
+            <button type="button" class="quick-idea-chip shrink-0 text-[11px] font-semibold bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 px-2.5 py-0.5 rounded-full" data-idea="Breakfast for Dinner">🥞 Breakfast</button>
+            <button type="button" class="quick-idea-chip shrink-0 text-[11px] font-semibold bg-white border border-slate-200 hover:border-emerald-400 text-slate-700 px-2.5 py-0.5 rounded-full" data-idea="Chicken Alfredo">🍗 Alfredo</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Filter Tabs -->
+      <div class="flex items-center justify-between pt-1">
+        <div class="flex gap-1 bg-slate-100 p-1 rounded-xl">
+          <button type="button" id="tab-all-meals" class="px-3 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm transition">All Meals</button>
+          <button type="button" id="tab-selected-meals" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-500 transition">In Plan (<span id="selected-count">0</span>)</button>
+        </div>
+        <button type="button" id="clear-meals-btn" class="text-xs text-slate-400 hover:text-rose-600 font-medium">Clear Plan</button>
+      </div>
+
+      <!-- Meal Cards with Live Editable Ingredients -->
+      <div id="meal-list" class="space-y-3"></div>
+    </section>
+
+    <!-- 3. Aisle-Sorted Shopping List -->
+    <section class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+      <div class="flex justify-between items-center">
+        <div>
+          <h2 class="font-bold text-base text-slate-800">2. Consolidated Shopping List</h2>
+          <p class="text-xs text-slate-500">Known staples auto-price; unknown items stay unpriced until you set them.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="copy-list-btn" class="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg transition">
+            📋 Copy
+          </button>
+          <button type="button" id="reset-prices-btn" class="text-xs text-slate-400 hover:text-slate-600 underline">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Add Extra Non-Meal Item (Smart Auto-Detect, No Fake Fallback) -->
+      <form id="extra-item-form" class="space-y-1.5 pt-1">
+        <div class="flex gap-1.5">
+          <input type="text" id="extra-item-name" list="grocery-suggestions" placeholder="Add item (e.g. Milk, Avocados, Bacon)"
+            class="flex-1 min-w-0 bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <select id="extra-item-aisle" class="bg-slate-100 border border-slate-200 rounded-xl px-2 py-2 text-xs font-medium text-slate-600 focus:outline-none">
+            <option value="Produce">Produce</option>
+            <option value="Meat">Meat</option>
+            <option value="Seafood">Seafood</option>
+            <option value="Dairy">Dairy</option>
+            <option value="Bakery/Tortillas">Bakery</option>
+            <option value="Pantry" selected>Pantry</option>
+            <option value="Frozen">Frozen</option>
+            <option value="Household/Other">Other</option>
+          </select>
+          <input type="number" id="extra-item-price" placeholder="?" step="0.01"
+            class="w-16 bg-slate-100 border border-slate-200 rounded-xl px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold px-3 rounded-xl transition">+</button>
+        </div>
+        <div id="extra-item-hint" class="text-[11px] font-medium px-1 hidden"></div>
+      </form>
+
+      <!-- Datalist for Instant Grocery Autocomplete -->
+      <datalist id="grocery-suggestions"></datalist>
+
+      <!-- Grouped Shopping List Container -->
+      <div id="shopping-list" class="space-y-4 pt-1">
+        <p class="text-xs text-slate-400 py-4 text-center">Select or build a meal above to generate your shopping list.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg opacity-0 pointer-events-none transition-opacity duration-200">
+    Updated!
+  </div>
+
+  <!-- Bottom Sheet Modal for Price & Pantry Editing -->
+  <div id="price-modal" class="fixed inset-0 z-50 hidden">
+    <div id="price-modal-backdrop" class="absolute inset-0 bg-black/45 backdrop-blur-[1px]"></div>
+    <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl p-5 shadow-2xl animate-slide-up space-y-4">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto"></div>
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-emerald-600" id="modal-store-label">Food Lion Price</div>
+        <h3 class="font-bold text-base text-slate-800" id="modal-item-title">Item Name</h3>
+        <p class="text-xs text-slate-500" id="modal-default-price">Est. default: $0.00</p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Unit Price at This Store ($)</label>
+          <input type="number" id="modal-price-input" step="0.01" min="0" placeholder="Enter price (e.g. 4.99)"
+            class="w-full bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2.5 text-lg font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1">
+          <button type="button" id="modal-pantry-btn" class="py-2.5 px-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-800 text-xs font-bold hover:bg-amber-100 transition">
+            🏠 Already Have ($0)
+          </button>
+          <button type="button" id="modal-reset-item-btn" class="py-2.5 px-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition">
+            ↺ Clear / Reset
+          </button>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" id="modal-cancel-btn" class="flex-1 py-3 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold">Cancel</button>
+          <button type="button" id="modal-save-btn" class="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-sm">Save Price</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet Modal for Backup / Restore -->
+  <div id="backup-modal" class="fixed inset-0 z-50 hidden">
+    <div id="backup-modal-backdrop" class="absolute inset-0 bg-black/45 backdrop-blur-[1px]"></div>
+    <div class="absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl p-5 shadow-2xl animate-slide-up space-y-4">
+      <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto"></div>
+      <div>
+        <h3 class="font-bold text-base text-slate-800">Backup & Transfer Your Data</h3>
+        <p class="text-xs text-slate-500">Save your custom meals, saved store prices, and shopping list so you never lose them when updating files.</p>
+      </div>
+      <div class="space-y-2.5">
+        <button type="button" id="export-json-btn" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm">
+          📋 Copy Backup Code to Clipboard
+        </button>
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase mb-1">Restore from Backup Code</label>
+          <textarea id="import-json-input" rows="3" placeholder="Paste your backup code here..."
+            class="w-full bg-slate-100 border border-slate-300 rounded-xl p-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" id="backup-close-btn" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">Close</button>
+          <button type="button" id="import-json-btn" class="flex-1 py-2.5 rounded-xl bg-slate-800 text-white text-xs font-bold">Restore Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Hide the JS-disabled warning immediately when script executes
+    const jsWarn = document.getElementById('js-warning');
+    if (jsWarn) jsWarn.style.display = 'none';
+
+    // Comprehensive Local Grocery Price & Aisle Dictionary (Avg US base prices before store multiplier)
+    const GROCERY_CATALOG = [
+      // Produce
+      { keywords: ['avocado'], name: 'Avocados (4 ct bag)', aisle: 'Produce', basePrice: 3.99 },
+      { keywords: ['banana'], name: 'Bananas (bunch)', aisle: 'Produce', basePrice: 1.49 },
+      { keywords: ['apple'], name: 'Honeycrisp / Gala Apples (3 lb)', aisle: 'Produce', basePrice: 4.49 },
+      { keywords: ['strawberr', 'berr', 'blueberr'], name: 'Fresh Berries (16 oz)', aisle: 'Produce', basePrice: 3.99 },
+      { keywords: ['lemon', 'lime'], name: 'Lemons / Limes (bag)', aisle: 'Produce', basePrice: 2.99 },
+      { keywords: ['cilantro', 'parsley', 'basil', 'herb'], name: 'Fresh Herbs Bunch', aisle: 'Produce', basePrice: 1.79 },
+      { keywords: ['jalapeno', 'jalapeño', 'serrano'], name: 'Jalapeño Peppers', aisle: 'Produce', basePrice: 1.29 },
+      { keywords: ['bell pepper', 'pepper'], name: 'Bell Peppers (3 pack)', aisle: 'Produce', basePrice: 3.99 },
+      { keywords: ['onion'], name: 'Yellow Onions (3 lb bag)', aisle: 'Produce', basePrice: 2.79 },
+      { keywords: ['garlic'], name: 'Fresh Garlic (3 ct)', aisle: 'Produce', basePrice: 1.69 },
+      { keywords: ['potato', 'russet', 'gold potato'], name: 'Baby Gold or Russet Potatoes (3-5 lb)', aisle: 'Produce', basePrice: 3.99 },
+      { keywords: ['sweet potato', 'yam'], name: 'Sweet Potatoes (3 lb)', aisle: 'Produce', basePrice: 3.49 },
+      { keywords: ['broccoli'], name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 },
+      { keywords: ['green bean'], name: 'Fresh Green Beans (1 lb)', aisle: 'Produce', basePrice: 2.49 },
+      { keywords: ['asparagus'], name: 'Fresh Asparagus (1 lb)', aisle: 'Produce', basePrice: 3.49 },
+      { keywords: ['spinach', 'kale', 'greens'], name: 'Baby Spinach / Greens', aisle: 'Produce', basePrice: 2.99 },
+      { keywords: ['lettuce', 'romaine', 'salad'], name: 'Romaine Lettuce / Salad Mix', aisle: 'Produce', basePrice: 2.99 },
+      { keywords: ['tomato', 'roma', 'cherry tomato'], name: 'Tomatoes on the Vine', aisle: 'Produce', basePrice: 2.79 },
+      { keywords: ['mushroom'], name: 'Sliced Baby Bella Mushrooms (8 oz)', aisle: 'Produce', basePrice: 2.49 },
+      { keywords: ['zucchini', 'squash'], name: 'Zucchini / Yellow Squash', aisle: 'Produce', basePrice: 2.29 },
+      { keywords: ['carrot', 'celery'], name: 'Carrots / Celery', aisle: 'Produce', basePrice: 1.99 },
+      { keywords: ['cucumber'], name: 'English Cucumber', aisle: 'Produce', basePrice: 1.69 },
+      { keywords: ['cabbage', 'slaw', 'coleslaw'], name: 'Shredded Cabbage / Coleslaw Mix', aisle: 'Produce', basePrice: 2.29 },
+      { keywords: ['corn on the cob', 'sweet corn'], name: 'Sweet Corn (4 ears)', aisle: 'Produce', basePrice: 2.99 },
+
+      // Meat & Poultry
+      { keywords: ['chicken breast'], name: 'Boneless Chicken Breast (2.5 lbs)', aisle: 'Meat', basePrice: 8.50 },
+      { keywords: ['chicken thigh'], name: 'Boneless Chicken Thighs (2 lbs)', aisle: 'Meat', basePrice: 6.50 },
+      { keywords: ['chicken wing', 'drumstick', 'chicken'], name: 'Chicken Cut (2 lbs)', aisle: 'Meat', basePrice: 7.49 },
+      { keywords: ['ground beef', 'hamburger meat', 'chuck'], name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+      { keywords: ['ground turkey'], name: 'Lean Ground Turkey (1.5 lbs)', aisle: 'Meat', basePrice: 6.49 },
+      { keywords: ['steak', 'sirloin', 'ribeye', 'flank'], name: 'Sirloin / Flank Steak (1.5 lbs)', aisle: 'Meat', basePrice: 11.99 },
+      { keywords: ['roast', 'chuck roast', 'brisket'], name: 'Beef Chuck Roast (2.5 lbs)', aisle: 'Meat', basePrice: 14.99 },
+      { keywords: ['pork chop'], name: 'Boneless Pork Chops (2 lbs)', aisle: 'Meat', basePrice: 7.49 },
+      { keywords: ['pork tenderloin', 'pork loin', 'pork'], name: 'Pork Tenderloin (2 lbs)', aisle: 'Meat', basePrice: 7.99 },
+      { keywords: ['bacon'], name: 'Thick-Cut Bacon (16 oz)', aisle: 'Meat', basePrice: 5.99 },
+      { keywords: ['sausage', 'bratwurst', 'kielbasa'], name: 'Italian Sausage Links (1.5 lbs)', aisle: 'Meat', basePrice: 5.99 },
+      { keywords: ['meatball'], name: 'Homestyle Meatballs (24 oz)', aisle: 'Meat', basePrice: 6.49 },
+      { keywords: ['deli', 'lunch meat', 'sliced turkey', 'ham'], name: 'Deli Sliced Turkey / Ham (1 lb)', aisle: 'Meat', basePrice: 6.99 },
+      { keywords: ['hot dog'], name: 'All-Beef Hot Dogs (8 ct)', aisle: 'Meat', basePrice: 4.49 },
+
+      // Seafood
+      { keywords: ['salmon'], name: 'Atlantic Salmon Fillets (1.5 lbs)', aisle: 'Seafood', basePrice: 12.99 },
+      { keywords: ['shrimp'], name: 'Raw Peeled Shrimp (1.5 lbs)', aisle: 'Seafood', basePrice: 9.99 },
+      { keywords: ['tilapia', 'cod', 'mahi', 'fish'], name: 'White Fish Fillets (1.5 lbs)', aisle: 'Seafood', basePrice: 8.99 },
+
+      // Dairy & Eggs
+      { keywords: ['milk'], name: 'Milk (1 Gallon)', aisle: 'Dairy', basePrice: 3.69 },
+      { keywords: ['almond milk', 'oat milk'], name: 'Almond / Oat Milk (64 oz)', aisle: 'Dairy', basePrice: 3.49 },
+      { keywords: ['egg'], name: 'Large Eggs (18 ct)', aisle: 'Dairy', basePrice: 4.49 },
+      { keywords: ['butter'], name: 'Salted Butter Quarters (1 lb)', aisle: 'Dairy', basePrice: 4.49 },
+      { keywords: ['shredded cheese', 'cheddar', 'mozzarella', 'mexican cheese', 'cheese'], name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 },
+      { keywords: ['parmesan'], name: 'Grated / Shaved Parmesan', aisle: 'Dairy', basePrice: 3.99 },
+      { keywords: ['cream cheese'], name: 'Cream Cheese Brick (8 oz)', aisle: 'Dairy', basePrice: 2.49 },
+      { keywords: ['sour cream'], name: 'Sour Cream (16 oz)', aisle: 'Dairy', basePrice: 2.29 },
+      { keywords: ['heavy cream', 'half and half', 'creamer'], name: 'Heavy Cream / Coffee Creamer', aisle: 'Dairy', basePrice: 3.99 },
+      { keywords: ['yogurt', 'greek yogurt'], name: 'Greek Yogurt (32 oz)', aisle: 'Dairy', basePrice: 4.99 },
+
+      // Bakery & Tortillas
+      { keywords: ['bread', 'loaf', 'sourdough', 'brioche'], name: 'Sliced Loaf Bread / Brioche', aisle: 'Bakery/Tortillas', basePrice: 3.29 },
+      { keywords: ['bun', 'roll', 'hoagie'], name: 'Burger / Hot Dog Buns (8 ct)', aisle: 'Bakery/Tortillas', basePrice: 2.99 },
+      { keywords: ['tortilla', 'wrap'], name: 'Flour or Corn Tortillas', aisle: 'Bakery/Tortillas', basePrice: 2.99 },
+      { keywords: ['taco shell'], name: 'Crunchy Taco Shells (12 ct)', aisle: 'Bakery/Tortillas', basePrice: 2.49 },
+      { keywords: ['bagel', 'english muffin'], name: 'Bagels / English Muffins (6 ct)', aisle: 'Bakery/Tortillas', basePrice: 3.49 },
+      { keywords: ['naan', 'pita', 'flatbread'], name: 'Naan / Pita Flatbread', aisle: 'Bakery/Tortillas', basePrice: 3.79 },
+      { keywords: ['garlic bread'], name: 'Garlic Bread Loaf', aisle: 'Bakery/Tortillas', basePrice: 2.99 },
+
+      // Pantry & Dry Goods
+      { keywords: ['rice', 'jasmine', 'basmati'], name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 },
+      { keywords: ['pasta', 'spaghetti', 'penne', 'ziti', 'macaroni', 'noodle'], name: 'Pasta / Spaghetti (16 oz)', aisle: 'Pantry', basePrice: 1.79 },
+      { keywords: ['marinara', 'pasta sauce', 'tomato sauce'], name: 'Marinara / Pasta Sauce (24 oz)', aisle: 'Pantry', basePrice: 2.89 },
+      { keywords: ['alfredo'], name: 'Alfredo Pasta Sauce (15 oz)', aisle: 'Pantry', basePrice: 3.29 },
+      { keywords: ['salsa', 'pico'], name: 'Chunky Salsa (16 oz)', aisle: 'Pantry', basePrice: 2.99 },
+      { keywords: ['taco seasoning', 'seasoning', 'spice'], name: 'Seasoning Packet / Spice Blend', aisle: 'Pantry', basePrice: 1.49 },
+      { keywords: ['black bean', 'kidney bean', 'pinto bean', 'beans', 'chickpea'], name: 'Canned Beans (2 cans)', aisle: 'Pantry', basePrice: 2.39 },
+      { keywords: ['diced tomato', 'crushed tomato', 'tomato paste'], name: 'Canned Tomatoes (2 cans)', aisle: 'Pantry', basePrice: 2.59 },
+      { keywords: ['broth', 'stock'], name: 'Chicken / Beef Broth (32 oz)', aisle: 'Pantry', basePrice: 2.49 },
+      { keywords: ['olive oil', 'vegetable oil', 'cooking spray', 'oil'], name: 'Olive / Cooking Oil', aisle: 'Pantry', basePrice: 6.49 },
+      { keywords: ['soy sauce', 'teriyaki', 'stir fry sauce'], name: 'Soy / Teriyaki Sauce', aisle: 'Pantry', basePrice: 3.49 },
+      { keywords: ['bbq', 'barbecue', 'ketchup', 'mustard', 'mayo'], name: 'Condiment / Sauce Bottle', aisle: 'Pantry', basePrice: 3.29 },
+      { keywords: ['peanut butter', 'jelly', 'jam'], name: 'Peanut Butter / Jam', aisle: 'Pantry', basePrice: 3.49 },
+      { keywords: ['coffee', 'k-cup', 'espresso'], name: 'Ground Coffee / Pods', aisle: 'Pantry', basePrice: 7.99 },
+      { keywords: ['cereal', 'oatmeal', 'granola'], name: 'Cereal / Rolled Oats', aisle: 'Pantry', basePrice: 3.99 },
+      { keywords: ['chips', 'tortilla chips', 'pretzel', 'crackers'], name: 'Chips / Crackers', aisle: 'Pantry', basePrice: 3.49 },
+
+      // Frozen
+      { keywords: ['fries', 'french fries', 'tater tot'], name: 'Frozen French Fries / Tots', aisle: 'Frozen', basePrice: 3.79 },
+      { keywords: ['frozen veggie', 'frozen broccoli', 'frozen corn', 'peas'], name: 'Steam-in-Bag Frozen Veggies', aisle: 'Frozen', basePrice: 1.99 },
+      { keywords: ['ice cream', 'frozen dessert'], name: 'Ice Cream (48 oz)', aisle: 'Frozen', basePrice: 4.49 },
+      { keywords: ['frozen pizza'], name: 'Frozen Pizza', aisle: 'Frozen', basePrice: 5.99 },
+
+      // Household & Other
+      { keywords: ['paper towel'], name: 'Paper Towels (6 rolls)', aisle: 'Household/Other', basePrice: 8.99 },
+      { keywords: ['toilet paper', 'bath tissue'], name: 'Toilet Paper (12 rolls)', aisle: 'Household/Other', basePrice: 9.99 },
+      { keywords: ['trash bag', 'garbage bag'], name: 'Tall Kitchen Trash Bags', aisle: 'Household/Other', basePrice: 7.99 },
+      { keywords: ['dish soap', 'detergent', 'pod'], name: 'Dish / Laundry Detergent', aisle: 'Household/Other', basePrice: 6.99 },
+      { keywords: ['foil', 'ziploc', 'plastic wrap', 'parchment'], name: 'Foil / Storage Bags', aisle: 'Household/Other', basePrice: 3.99 }
+    ];
+
+    const DEFAULT_MEALS = [
+      {
+        id: 'sheet-pan-fajitas',
+        name: 'Sheet Pan Chicken Fajitas',
+        allergens: [],
+        tags: ['High Protein', 'Kid Friendly'],
+        ingredients: [
+          { id: 'ing-1', name: 'Boneless Chicken Breast (2.5 lbs)', aisle: 'Meat', basePrice: 8.50 },
+          { id: 'ing-2', name: 'Bell Peppers (3 pack)', aisle: 'Produce', basePrice: 3.99 },
+          { id: 'ing-3', name: 'Yellow Onions (3 lb bag)', aisle: 'Produce', basePrice: 2.79 },
+          { id: 'ing-4', name: 'Flour or Corn Tortillas', aisle: 'Bakery/Tortillas', basePrice: 2.99 }
+        ]
+      },
+      {
+        id: 'baked-ziti',
+        name: 'Classic Baked Ziti & Meat Sauce',
+        allergens: ['gluten', 'dairy'],
+        tags: ['Leftover Friendly'],
+        ingredients: [
+          { id: 'ing-5', name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { id: 'ing-6', name: 'Pasta / Spaghetti (16 oz)', aisle: 'Pantry', basePrice: 1.79 },
+          { id: 'ing-7', name: 'Marinara / Pasta Sauce (24 oz)', aisle: 'Pantry', basePrice: 2.89 },
+          { id: 'ing-8', name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 }
+        ]
+      },
+      {
+        id: 'pork-tenderloin',
+        name: 'Roasted Pork Loin & Green Beans',
+        allergens: [],
+        tags: ['Budget Pick'],
+        ingredients: [
+          { id: 'ing-9', name: 'Pork Tenderloin (2 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { id: 'ing-10', name: 'Fresh Green Beans (1 lb)', aisle: 'Produce', basePrice: 2.49 },
+          { id: 'ing-11', name: 'Baby Gold or Russet Potatoes (3-5 lb)', aisle: 'Produce', basePrice: 3.99 }
+        ]
+      },
+      {
+        id: 'teriyaki-salmon-bowls',
+        name: 'Teriyaki Salmon & Rice Bowls',
+        allergens: ['gluten'],
+        tags: ['Quick 20-Min'],
+        ingredients: [
+          { id: 'ing-12', name: 'Atlantic Salmon Fillets (1.5 lbs)', aisle: 'Seafood', basePrice: 12.99 },
+          { id: 'ing-13', name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 },
+          { id: 'ing-14', name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 },
+          { id: 'ing-15', name: 'Soy / Teriyaki Sauce', aisle: 'Pantry', basePrice: 3.49 }
+        ]
+      },
+      {
+        id: 'beef-broccoli',
+        name: 'Skillet Beef & Broccoli',
+        allergens: ['gluten'],
+        tags: ['High Protein', 'Quick 20-Min'],
+        ingredients: [
+          { id: 'ing-16', name: 'Sirloin / Flank Steak (1.5 lbs)', aisle: 'Meat', basePrice: 11.99 },
+          { id: 'ing-17', name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 },
+          { id: 'ing-18', name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 },
+          { id: 'ing-19', name: 'Soy / Teriyaki Sauce', aisle: 'Pantry', basePrice: 3.49 }
+        ]
+      }
+    ];
+
+    const MEAL_TEMPLATES = [
+      {
+        keywords: ['taco', 'burrito', 'quesadilla', 'nacho', 'enchilada', 'mexican'],
+        tags: ['Family Favorite', 'Quick 20-Min'],
+        ingredients: [
+          { name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { name: 'Flour or Corn Tortillas', aisle: 'Bakery/Tortillas', basePrice: 2.99 },
+          { name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 },
+          { name: 'Romaine Lettuce / Salad Mix', aisle: 'Produce', basePrice: 2.99 },
+          { name: 'Chunky Salsa (16 oz)', aisle: 'Pantry', basePrice: 2.99 },
+          { name: 'Sour Cream (16 oz)', aisle: 'Dairy', basePrice: 2.29 }
+        ]
+      },
+      {
+        keywords: ['spaghetti', 'pasta', 'meatball', 'lasagna', 'penne', 'marinara'],
+        tags: ['Budget Pick', 'Leftover Friendly'],
+        ingredients: [
+          { name: 'Pasta / Spaghetti (16 oz)', aisle: 'Pantry', basePrice: 1.79 },
+          { name: 'Marinara / Pasta Sauce (24 oz)', aisle: 'Pantry', basePrice: 2.89 },
+          { name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { name: 'Grated / Shaved Parmesan', aisle: 'Dairy', basePrice: 3.99 },
+          { name: 'Garlic Bread Loaf', aisle: 'Bakery/Tortillas', basePrice: 2.99 }
+        ]
+      },
+      {
+        keywords: ['alfredo'],
+        tags: ['Comfort Food'],
+        ingredients: [
+          { name: 'Boneless Chicken Breast (2.5 lbs)', aisle: 'Meat', basePrice: 8.50 },
+          { name: 'Pasta / Spaghetti (16 oz)', aisle: 'Pantry', basePrice: 1.79 },
+          { name: 'Alfredo Pasta Sauce (15 oz)', aisle: 'Pantry', basePrice: 3.29 },
+          { name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 }
+        ]
+      },
+      {
+        keywords: ['burger', 'cheeseburger', 'slider', 'patty'],
+        tags: ['Kid Friendly', 'Grill / Skillet'],
+        ingredients: [
+          { name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { name: 'Burger / Hot Dog Buns (8 ct)', aisle: 'Bakery/Tortillas', basePrice: 2.99 },
+          { name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 },
+          { name: 'Tomatoes on the Vine', aisle: 'Produce', basePrice: 2.79 },
+          { name: 'Frozen French Fries / Tots', aisle: 'Frozen', basePrice: 3.79 }
+        ]
+      },
+      {
+        keywords: ['breakfast', 'pancake', 'waffle', 'egg', 'bacon', 'omelet'],
+        tags: ['Budget Pick', 'Kid Friendly'],
+        ingredients: [
+          { name: 'Large Eggs (18 ct)', aisle: 'Dairy', basePrice: 4.49 },
+          { name: 'Thick-Cut Bacon (16 oz)', aisle: 'Meat', basePrice: 5.99 },
+          { name: 'Cereal / Rolled Oats', aisle: 'Pantry', basePrice: 3.99 },
+          { name: 'Fresh Berries (16 oz)', aisle: 'Produce', basePrice: 3.99 }
+        ]
+      },
+      {
+        keywords: ['stir fry', 'stir-fry', 'fried rice', 'teriyaki', 'asian', 'lo mein'],
+        tags: ['Quick 20-Min', 'One-Pan'],
+        ingredients: [
+          { name: 'Boneless Chicken Thighs (2 lbs)', aisle: 'Meat', basePrice: 6.50 },
+          { name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 },
+          { name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 },
+          { name: 'Soy / Teriyaki Sauce', aisle: 'Pantry', basePrice: 3.49 }
+        ]
+      },
+      {
+        keywords: ['pizza', 'flatbread', 'calzone'],
+        tags: ['Kid Friendly', 'Friday Night'],
+        ingredients: [
+          { name: 'Naan / Pita Flatbread', aisle: 'Bakery/Tortillas', basePrice: 3.79 },
+          { name: 'Marinara / Pasta Sauce (24 oz)', aisle: 'Pantry', basePrice: 2.89 },
+          { name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 },
+          { name: 'Bell Peppers (3 pack)', aisle: 'Produce', basePrice: 3.99 }
+        ]
+      },
+      {
+        keywords: ['chili', 'soup', 'stew', 'chowder'],
+        tags: ['Leftover Friendly', 'Cozy'],
+        ingredients: [
+          { name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { name: 'Canned Beans (2 cans)', aisle: 'Pantry', basePrice: 2.39 },
+          { name: 'Canned Tomatoes (2 cans)', aisle: 'Pantry', basePrice: 2.59 },
+          { name: 'Yellow Onions (3 lb bag)', aisle: 'Produce', basePrice: 2.79 },
+          { name: 'Shredded Cheese (8-16 oz)', aisle: 'Dairy', basePrice: 3.79 }
+        ]
+      },
+      {
+        keywords: ['meatloaf'],
+        tags: ['Comfort Food', 'Leftover Friendly'],
+        ingredients: [
+          { name: 'Ground Beef 85/15 (1.5 lbs)', aisle: 'Meat', basePrice: 7.99 },
+          { name: 'Baby Gold or Russet Potatoes (3-5 lb)', aisle: 'Produce', basePrice: 3.99 },
+          { name: 'Fresh Green Beans (1 lb)', aisle: 'Produce', basePrice: 2.49 },
+          { name: 'Condiment / Sauce Bottle', aisle: 'Pantry', basePrice: 3.29 }
+        ]
+      },
+      {
+        keywords: ['chicken'],
+        tags: ['High Protein'],
+        ingredients: [
+          { name: 'Boneless Chicken Breast (2.5 lbs)', aisle: 'Meat', basePrice: 8.50 },
+          { name: 'Broccoli Crowns (1.5 lbs)', aisle: 'Produce', basePrice: 2.99 },
+          { name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 }
+        ]
+      },
+      {
+        keywords: ['salmon', 'fish', 'shrimp', 'seafood'],
+        tags: ['High Protein', 'Quick 20-Min'],
+        ingredients: [
+          { name: 'Raw Peeled Shrimp (1.5 lbs)', aisle: 'Seafood', basePrice: 9.99 },
+          { name: 'Fresh Asparagus (1 lb)', aisle: 'Produce', basePrice: 3.49 },
+          { name: 'Jasmine / White Rice (2 lbs)', aisle: 'Pantry', basePrice: 3.29 }
+        ]
+      },
+      {
+        keywords: ['steak', 'beef', 'roast', 'pork'],
+        tags: ['Hearty'],
+        ingredients: [
+          { name: 'Sirloin / Flank Steak (1.5 lbs)', aisle: 'Meat', basePrice: 11.99 },
+          { name: 'Baby Gold or Russet Potatoes (3-5 lb)', aisle: 'Produce', basePrice: 3.99 },
+          { name: 'Fresh Green Beans (1 lb)', aisle: 'Produce', basePrice: 2.49 }
+        ]
+      }
+    ];
+
+    const AISLE_ORDER = [
+      'Produce',
+      'Meat',
+      'Seafood',
+      'Dairy',
+      'Bakery/Tortillas',
+      'Pantry',
+      'Frozen',
+      'Household/Other'
+    ];
+
+    function safeGetStorage(key, fallback) {
+      try {
+        const val = localStorage.getItem(key);
+        return val !== null ? JSON.parse(val) : fallback;
+      } catch (e) {
+        return fallback;
+      }
+    }
+
+    function safeSetStorage(key, value) {
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch (e) {}
+    }
+
+    let state = {
+      budget: safeGetStorage('sc_v6_budget', 150),
+      multiplier: safeGetStorage('sc_v6_multiplier', 0.92),
+      storeName: safeGetStorage('sc_v6_storeName', 'Food Lion'),
+      allergies: safeGetStorage('sc_v6_allergies', []),
+      meals: safeGetStorage('sc_v6_meals', JSON.parse(JSON.stringify(DEFAULT_MEALS))),
+      selectedMealIds: safeGetStorage('sc_v6_selectedMeals', ['sheet-pan-fajitas']),
+      mealMultipliers: safeGetStorage('sc_v6_mealMultipliers', {}),
+      extraItems: safeGetStorage('sc_v6_extraItems', []),
+      priceOverrides: safeGetStorage('sc_v6_priceOverrides', {}),
+      qtyOverrides: safeGetStorage('sc_v6_qtyOverrides', {}),
+      checkedItems: safeGetStorage('sc_v6_checkedItems', {}),
+      mealFilterTab: 'all',
+      expandedMealIds: { 'sheet-pan-fajitas': true }
+    };
+
+    let activeModalItem = null;
+
+    function saveState() {
+      safeSetStorage('sc_v6_budget', state.budget);
+      safeSetStorage('sc_v6_multiplier', state.multiplier);
+      safeSetStorage('sc_v6_storeName', state.storeName);
+      safeSetStorage('sc_v6_allergies', state.allergies);
+      safeSetStorage('sc_v6_meals', state.meals);
+      safeSetStorage('sc_v6_selectedMeals', state.selectedMealIds);
+      safeSetStorage('sc_v6_mealMultipliers', state.mealMultipliers);
+      safeSetStorage('sc_v6_extraItems', state.extraItems);
+      safeSetStorage('sc_v6_priceOverrides', state.priceOverrides);
+      safeSetStorage('sc_v6_qtyOverrides', state.qtyOverrides);
+      safeSetStorage('sc_v6_checkedItems', state.checkedItems);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0');
+      setTimeout(() => toast.classList.add('opacity-0'), 2200);
+    }
+
+    function lookupCatalogItem(rawName) {
+      const lower = rawName.trim().toLowerCase();
+      if (!lower) return null;
+      const exact = GROCERY_CATALOG.find(c => c.name.toLowerCase() === lower);
+      if (exact) return exact;
+      let bestMatch = null;
+      let bestLen = 0;
+      for (const item of GROCERY_CATALOG) {
+        for (const kw of item.keywords) {
+          if (lower.includes(kw) && kw.length > bestLen) {
+            bestMatch = item;
+            bestLen = kw.length;
+          }
+        }
+      }
+      return bestMatch;
+    }
+
+    function populateDatalist() {
+      const dl = document.getElementById('grocery-suggestions');
+      dl.innerHTML = GROCERY_CATALOG.map(c => `<option value="${escapeHtml(c.name)}"></option>`).join('');
+    }
+
+    function getStoreOverrideKey(itemName) {
+      return `${state.storeName}::${itemName.trim().toLowerCase()}`;
+    }
+
+    function getDefaultItemPrice(item) {
+      if (item.basePrice === null || item.basePrice === undefined) return null;
+      return +(item.basePrice * state.multiplier).toFixed(2);
+    }
+
+    function getItemPrice(item) {
+      const storeKey = getStoreOverrideKey(item.name);
+      if (state.priceOverrides[storeKey] !== undefined) {
+        return state.priceOverrides[storeKey];
+      }
+      return getDefaultItemPrice(item);
+    }
+
+    function hasCustomPrice(itemName) {
+      return state.priceOverrides[getStoreOverrideKey(itemName)] !== undefined;
+    }
+
+    function getMealMultiplier(mealId) {
+      return state.mealMultipliers[mealId] || 1;
+    }
+
+    function getMealCost(meal) {
+      const mult = getMealMultiplier(meal.id);
+      return meal.ingredients.reduce((sum, ing) => {
+        const p = getItemPrice(ing);
+        return sum + (p !== null ? p : 0);
+      }, 0) * mult;
+    }
+
+    function getMealUnpricedCount(meal) {
+      return meal.ingredients.filter(ing => getItemPrice(ing) === null).length;
+    }
+
+    function isMealSafe(meal) {
+      return !(meal.allergens || []).some(a => state.allergies.includes(a));
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function generateSmartIngredients(mealName) {
+      const lower = mealName.toLowerCase();
+      for (const tpl of MEAL_TEMPLATES) {
+        if (tpl.keywords.some(kw => lower.includes(kw))) {
+          return {
+            tags: [...tpl.tags],
+            ingredients: tpl.ingredients.map((ing, idx) => ({
+              id: 'ing-' + Date.now() + '-' + idx,
+              name: ing.name,
+              aisle: ing.aisle,
+              basePrice: ing.basePrice
+            }))
+          };
+        }
+      }
+      return {
+        tags: ['Custom Meal'],
+        ingredients: []
+      };
+    }
+
+    function createMealFromName(rawName) {
+      const name = rawName.trim();
+      if (!name) return;
+
+      const generated = generateSmartIngredients(name);
+      const newId = 'meal-' + Date.now();
+      const newMeal = {
+        id: newId,
+        name: name,
+        allergens: [],
+        tags: generated.tags,
+        isCustom: true,
+        ingredients: generated.ingredients
+      };
+
+      state.meals.unshift(newMeal);
+      state.selectedMealIds.push(newId);
+      state.expandedMealIds[newId] = true;
+      saveState();
+      render();
+      if (generated.ingredients.length > 0) {
+        showToast(`Created "${name}" with ${generated.ingredients.length} ingredients!`);
+      } else {
+        showToast(`Created "${name}" — add its ingredients below.`);
+      }
+    }
+
+    function render() {
+      document.getElementById('budget-input').value = state.budget;
+      document.getElementById('display-budget').textContent = state.budget;
+      document.getElementById('store-badge').textContent = `${state.storeName} (${state.multiplier}x avg)`;
+
+      const storeSelect = document.getElementById('store-select');
+      for (let i = 0; i < storeSelect.options.length; i++) {
+        if (storeSelect.options[i].dataset.name === state.storeName) {
+          storeSelect.selectedIndex = i;
+          break;
+        }
+      }
+
+      document.querySelectorAll('.allergy-btn').forEach(btn => {
+        const allergy = btn.dataset.allergy;
+        if (state.allergies.includes(allergy)) {
+          btn.classList.add('bg-amber-500', 'text-white', 'border-amber-500');
+          btn.classList.remove('bg-white', 'text-slate-600', 'border-slate-300');
+        } else {
+          btn.classList.remove('bg-amber-500', 'text-white', 'border-amber-500');
+          btn.classList.add('bg-white', 'text-slate-600', 'border-slate-300');
+        }
+      });
+
+      state.selectedMealIds = state.selectedMealIds.filter(id => state.meals.some(m => m.id === id));
+      document.getElementById('selected-count').textContent = state.selectedMealIds.length;
+
+      const tabAll = document.getElementById('tab-all-meals');
+      const tabSel = document.getElementById('tab-selected-meals');
+      if (state.mealFilterTab === 'all') {
+        tabAll.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm transition';
+        tabSel.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-500 transition';
+      } else {
+        tabSel.className = 'px-3 py-1 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm transition';
+        tabAll.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-500 transition';
+      }
+
+      const mealListEl = document.getElementById('meal-list');
+      mealListEl.innerHTML = '';
+
+      const visibleMeals = state.meals.filter(meal => {
+        const safe = isMealSafe(meal);
+        const selected = state.selectedMealIds.includes(meal.id);
+        if (!safe && !selected) return false;
+        if (state.mealFilterTab === 'selected' && !selected) return false;
+        return true;
+      });
+
+      if (visibleMeals.length === 0) {
+        mealListEl.innerHTML = `<p class="text-xs text-slate-400 py-5 text-center">${
+          state.mealFilterTab === 'selected'
+            ? 'No meals in your plan yet. Build one above or tap Auto-Plan.'
+            : 'No meals match your current dietary filters.'
+        }</p>`;
+      }
+
+      visibleMeals.forEach(meal => {
+        const safe = isMealSafe(meal);
+        const selected = state.selectedMealIds.includes(meal.id);
+        const mult = getMealMultiplier(meal.id);
+        const cost = getMealCost(meal).toFixed(2);
+        const unpricedCnt = getMealUnpricedCount(meal);
+        const isExpanded = !!state.expandedMealIds[meal.id];
+
+        const card = document.createElement('div');
+        card.className = `rounded-2xl border transition overflow-hidden ${
+          selected ? 'bg-emerald-50/70 border-emerald-500 shadow-sm' : 'bg-slate-50 border-slate-200'
+        }`;
+
+        card.innerHTML = `
+          <div class="p-3 flex justify-between items-center gap-2">
+            <div class="flex-1 min-w-0 cursor-pointer meal-toggle-area">
+              <div class="font-bold text-sm text-slate-800 flex items-center gap-1.5">
+                <span class="shrink-0 text-base">${selected ? '✅' : '⬜'}</span>
+                <span class="truncate">${escapeHtml(meal.name)}</span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-x-1.5">
+                <span>${(meal.tags || []).map(escapeHtml).join(' • ')}</span>
+                ${unpricedCnt > 0 ? `<span class="text-amber-600 font-semibold">• ${unpricedCnt} unpriced</span>` : ''}
+                ${!safe ? '<span class="text-rose-600 font-bold">(Allergy Warning)</span>' : ''}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${selected ? `
+                <button type="button" class="meal-mult-btn px-2 py-1 rounded-lg text-[11px] font-extrabold border ${
+                  mult > 1 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-300'
+                }" title="Double recipe batch">
+                  ${mult}x
+                </button>
+              ` : ''}
+              <button type="button" class="toggle-ing-btn px-2.5 py-1 rounded-lg text-[11px] font-bold border ${
+                isExpanded ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300'
+              }">
+                ${isExpanded ? 'Hide' : `${meal.ingredients.length} items`}
+              </button>
+              <div class="text-right min-w-[54px] cursor-pointer meal-toggle-area">
+                <span class="font-extrabold text-sm text-slate-900">$${cost}</span>
+              </div>
+            </div>
+          </div>
+
+          ${isExpanded ? `
+            <div class="px-3 pb-3 pt-2 border-t border-slate-200/80 bg-white space-y-2">
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Ingredients & Prices</span>
+                ${meal.isCustom ? `
+                  <button type="button" class="delete-meal-btn text-[11px] font-semibold text-rose-500 hover:text-rose-700">Delete Meal</button>
+                ` : ''}
+              </div>
+
+              <div class="divide-y divide-slate-100 meal-ing-list"></div>
+
+              <form class="add-ing-to-meal-form flex gap-1.5 pt-1.5">
+                <input type="text" list="grocery-suggestions" placeholder="+ Add ingredient (e.g. Avocado, Bacon)"
+                  class="ing-name-input flex-1 min-w-0 bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <select class="ing-aisle-select bg-slate-100 border border-slate-200 rounded-lg px-1.5 py-1.5 text-[11px] text-slate-600 focus:outline-none">
+                  <option value="Produce">Produce</option>
+                  <option value="Meat">Meat</option>
+                  <option value="Seafood">Seafood</option>
+                  <option value="Dairy">Dairy</option>
+                  <option value="Bakery/Tortillas">Bakery</option>
+                  <option value="Pantry" selected>Pantry</option>
+                  <option value="Frozen">Frozen</option>
+                </select>
+                <input type="number" placeholder="?" step="0.01"
+                  class="ing-price-input w-14 bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-2.5 rounded-lg">+</button>
+              </form>
+            </div>
+          ` : ''}
+        `;
+
+        card.querySelectorAll('.meal-toggle-area').forEach(el => {
+          el.addEventListener('click', () => {
+            if (selected) {
+              state.selectedMealIds = state.selectedMealIds.filter(id => id !== meal.id);
+            } else {
+              state.selectedMealIds.push(meal.id);
+              state.expandedMealIds[meal.id] = true;
+            }
+            saveState();
+            render();
+          });
+        });
+
+        card.querySelector('.toggle-ing-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          state.expandedMealIds[meal.id] = !state.expandedMealIds[meal.id];
+          render();
+        });
+
+        const multBtn = card.querySelector('.meal-mult-btn');
+        if (multBtn) {
+          multBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.mealMultipliers[meal.id] = mult === 1 ? 2 : 1;
+            saveState();
+            render();
+          });
+        }
+
+        const delMealBtn = card.querySelector('.delete-meal-btn');
+        if (delMealBtn) {
+          delMealBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            state.meals = state.meals.filter(m => m.id !== meal.id);
+            state.selectedMealIds = state.selectedMealIds.filter(id => id !== meal.id);
+            delete state.mealMultipliers[meal.id];
+            saveState();
+            render();
+          });
+        }
+
+        if (isExpanded) {
+          const ingListContainer = card.querySelector('.meal-ing-list');
+          if (meal.ingredients.length === 0) {
+            ingListContainer.innerHTML = '<p class="text-[11px] text-slate-400 py-1.5">No ingredients yet. Add items below—known staples auto-price, and custom items stay unpriced until you set a price.</p>';
+          } else {
+            meal.ingredients.forEach(ing => {
+              const unitP = getItemPrice(ing);
+              const isUnpriced = unitP === null;
+              const isCustomP = hasCustomPrice(ing.name);
+              const priceLabel = isUnpriced ? 'Set $' : `$${(unitP * mult).toFixed(2)}`;
+
+              const ingRow = document.createElement('div');
+              ingRow.className = 'py-1.5 flex items-center justify-between gap-2 text-xs';
+              ingRow.innerHTML = `
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium text-slate-700 truncate">${escapeHtml(ing.name)}</div>
+                  <div class="text-[10px] text-slate-400">${escapeHtml(ing.aisle)}${mult > 1 ? ` • ${mult}x batch` : ''}${isUnpriced ? ' • No price estimate' : ''}</div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <button type="button" class="edit-meal-ing-price px-2 py-0.5 rounded-md font-bold text-xs ${
+                    isUnpriced
+                      ? 'bg-rose-50 text-rose-700 border border-rose-300 border-dashed'
+                      : unitP === 0
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : isCustomP
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }">
+                    ${priceLabel}
+                  </button>
+                  <button type="button" class="remove-meal-ing-btn text-slate-400 hover:text-rose-600 px-1 font-bold" title="Remove ingredient">
+                    ✕
+                  </button>
+                </div>
+              `;
+
+              ingRow.querySelector('.edit-meal-ing-price').addEventListener('click', () => {
+                openPriceModal(ing);
+              });
+
+              ingRow.querySelector('.remove-meal-ing-btn').addEventListener('click', () => {
+                meal.ingredients = meal.ingredients.filter(i => i.id !== ing.id);
+                saveState();
+                render();
+              });
+
+              ingListContainer.appendChild(ingRow);
+            });
+          }
+
+          const addIngForm = card.querySelector('.add-ing-to-meal-form');
+          const nameInp = addIngForm.querySelector('.ing-name-input');
+          const aisleSel = addIngForm.querySelector('.ing-aisle-select');
+          const priceInp = addIngForm.querySelector('.ing-price-input');
+
+          nameInp.addEventListener('input', () => {
+            const match = lookupCatalogItem(nameInp.value);
+            if (match) {
+              aisleSel.value = match.aisle;
+              priceInp.placeholder = `$${(match.basePrice * state.multiplier).toFixed(2)}`;
+            } else {
+              priceInp.placeholder = '?';
+            }
+          });
+
+          addIngForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const ingName = nameInp.value.trim();
+            if (!ingName) return;
+
+            const match = lookupCatalogItem(ingName);
+            const rawP = parseFloat(priceInp.value);
+            const hasManualPrice = !isNaN(rawP) && rawP >= 0;
+            const basePrice = hasManualPrice
+              ? +(rawP / state.multiplier).toFixed(2)
+              : (match ? match.basePrice : null);
+            const aisle = aisleSel.value;
+
+            meal.ingredients.push({
+              id: 'ing-' + Date.now(),
+              name: ingName,
+              aisle: aisle,
+              basePrice: basePrice
+            });
+
+            if (hasManualPrice) {
+              state.priceOverrides[getStoreOverrideKey(ingName)] = +rawP.toFixed(2);
+            }
+
+            if (!state.selectedMealIds.includes(meal.id)) {
+              state.selectedMealIds.push(meal.id);
+            }
+
+            saveState();
+            render();
+          });
+        }
+
+        mealListEl.appendChild(card);
+      });
+
+      const selectedMeals = state.meals.filter(m => state.selectedMealIds.includes(m.id));
+      const itemMap = {};
+
+      selectedMeals.forEach(meal => {
+        const mult = getMealMultiplier(meal.id);
+        meal.ingredients.forEach(ing => {
+          const key = ing.name.trim().toLowerCase();
+          if (!itemMap[key]) {
+            itemMap[key] = { ...ing, baseCount: mult, isExtra: false };
+          } else {
+            itemMap[key].baseCount += mult;
+            if (itemMap[key].basePrice === null && ing.basePrice !== null) {
+              itemMap[key].basePrice = ing.basePrice;
+            }
+          }
+        });
+      });
+
+      state.extraItems.forEach(extra => {
+        const key = extra.name.trim().toLowerCase();
+        if (!itemMap[key]) {
+          itemMap[key] = { ...extra, baseCount: 1, isExtra: true };
+        } else {
+          itemMap[key].baseCount += 1;
+        }
+      });
+
+      const items = Object.values(itemMap);
+      const shoppingListEl = document.getElementById('shopping-list');
+      let grandTotal = 0;
+      let unpricedItemsCount = 0;
+
+      if (items.length === 0) {
+        shoppingListEl.innerHTML = '<p class="text-xs text-slate-400 py-4 text-center">Select or build a meal above to generate your shopping list.</p>';
+      } else {
+        shoppingListEl.innerHTML = '';
+
+        const grouped = {};
+        items.forEach(item => {
+          const aisle = item.aisle || 'Household/Other';
+          if (!grouped[aisle]) grouped[aisle] = [];
+          grouped[aisle].push(item);
+        });
+
+        const sortedAisles = Object.keys(grouped).sort((a, b) => {
+          const idxA = AISLE_ORDER.indexOf(a);
+          const idxB = AISLE_ORDER.indexOf(b);
+          return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB);
+        });
+
+        sortedAisles.forEach(aisle => {
+          const aisleItems = grouped[aisle].sort((a, b) => a.name.localeCompare(b.name));
+          const section = document.createElement('div');
+          section.className = 'space-y-1';
+          section.innerHTML = `
+            <div class="flex items-center justify-between bg-slate-100 px-2.5 py-1 rounded-lg">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">${escapeHtml(aisle)}</span>
+              <span class="text-[10px] font-semibold text-slate-400">${aisleItems.length} item${aisleItems.length > 1 ? 's' : ''}</span>
+            </div>
+          `;
+
+          const listContainer = document.createElement('div');
+          listContainer.className = 'divide-y divide-slate-100';
+
+          aisleItems.forEach(item => {
+            const qtyKey = item.name.trim().toLowerCase();
+            const effectiveQty = state.qtyOverrides[qtyKey] !== undefined
+              ? state.qtyOverrides[qtyKey]
+              : item.baseCount;
+
+            const unitPrice = getItemPrice(item);
+            const isUnpriced = unitPrice === null;
+            const lineTotal = !isUnpriced ? unitPrice * effectiveQty : 0;
+            grandTotal += lineTotal;
+
+            if (isUnpriced && effectiveQty > 0) {
+              unpricedItemsCount++;
+            }
+
+            const isOverridden = hasCustomPrice(item.name);
+            const isOnHand = (!isUnpriced && unitPrice === 0) || effectiveQty === 0;
+            const isChecked = !!state.checkedItems[qtyKey];
+
+            const row = document.createElement('div');
+            row.className = `py-2.5 flex justify-between items-center gap-2 ${isChecked ? 'opacity-45' : ''}`;
+
+            row.innerHTML = `
+              <div class="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0 check-area">
+                <input type="checkbox" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-emerald-600 rounded shrink-0 pointer-events-none" />
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-slate-800 truncate ${isChecked ? 'line-through' : ''}">
+                    ${escapeHtml(item.name)}
+                  </div>
+                  <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    ${effectiveQty === 0
+                      ? '<span class="text-slate-400 font-semibold">Qty 0 ($0)</span>'
+                      : isUnpriced
+                        ? '<span class="text-rose-600 font-semibold">Unpriced — tap to set</span>'
+                        : isOnHand
+                          ? '<span class="text-amber-600 font-semibold">On Hand ($0)</span>'
+                          : isOverridden
+                            ? `<span class="text-blue-600 font-semibold">${escapeHtml(state.storeName)} Price</span>`
+                            : `<span>Est. $${unitPrice.toFixed(2)} ea</span>`
+                    }
+                    ${item.isExtra ? '<span>• Extra</span>' : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <div class="flex items-center bg-slate-100 rounded-lg border border-slate-200">
+                  <button type="button" class="qty-dec px-2 py-1 text-xs font-bold text-slate-600 hover:text-slate-900">−</button>
+                  <span class="px-1.5 text-xs font-extrabold text-slate-800">${effectiveQty}</span>
+                  <button type="button" class="qty-inc px-2 py-1 text-xs font-bold text-slate-600 hover:text-slate-900">+</button>
+                </div>
+
+                <button type="button" class="price-edit-btn min-w-[60px] px-2.5 py-1 rounded-lg text-sm font-bold text-right ${
+                  isUnpriced && effectiveQty > 0
+                    ? 'bg-rose-50 text-rose-700 border border-rose-300 border-dashed'
+                    : isOnHand
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : isOverridden
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-slate-100 text-slate-700'
+                }">
+                  ${isUnpriced && effectiveQty > 0 ? 'Set $' : `$${lineTotal.toFixed(2)}`}
+                </button>
+
+                ${item.isExtra ? `
+                  <button type="button" class="remove-extra-btn text-slate-400 hover:text-rose-600 px-1 text-xs font-bold" title="Remove item">✕</button>
+                ` : ''}
+              </div>
+            `;
+
+            row.querySelector('.check-area').addEventListener('click', () => {
+              state.checkedItems[qtyKey] = !state.checkedItems[qtyKey];
+              saveState();
+              render();
+            });
+
+            row.querySelector('.qty-dec').addEventListener('click', () => {
+              const nextQty = Math.max(0, effectiveQty - 1);
+              if (nextQty === item.baseCount) {
+                delete state.qtyOverrides[qtyKey];
+              } else {
+                state.qtyOverrides[qtyKey] = nextQty;
+              }
+              saveState();
+              render();
+            });
+
+            row.querySelector('.qty-inc').addEventListener('click', () => {
+              const nextQty = effectiveQty + 1;
+              if (nextQty === item.baseCount) {
+                delete state.qtyOverrides[qtyKey];
+              } else {
+                state.qtyOverrides[qtyKey] = nextQty;
+              }
+              saveState();
+              render();
+            });
+
+            row.querySelector('.price-edit-btn').addEventListener('click', () => {
+              openPriceModal(item);
+            });
+
+            const remExtraBtn = row.querySelector('.remove-extra-btn');
+            if (remExtraBtn) {
+              remExtraBtn.addEventListener('click', () => {
+                state.extraItems = state.extraItems.filter(e => e.name.trim().toLowerCase() !== qtyKey);
+                delete state.qtyOverrides[qtyKey];
+                delete state.checkedItems[qtyKey];
+                saveState();
+                render();
+              });
+            }
+
+            listContainer.appendChild(row);
+          });
+
+          section.appendChild(listContainer);
+          shoppingListEl.appendChild(section);
+        });
+      }
+
+      document.getElementById('total-cost').textContent = grandTotal.toFixed(2);
+      const totalMealCount = selectedMeals.reduce((sum, m) => sum + getMealMultiplier(m.id), 0);
+      const mealsTotalCost = selectedMeals.reduce((sum, m) => sum + getMealCost(m), 0);
+      const cpm = totalMealCount > 0 ? (mealsTotalCost / totalMealCount) : 0;
+      document.getElementById('cost-per-meal-badge').textContent = `$${cpm.toFixed(2)}/meal`;
+
+      const unpricedBanner = document.getElementById('unpriced-header-banner');
+      const unpricedText = document.getElementById('unpriced-header-text');
+      if (unpricedItemsCount > 0) {
+        unpricedBanner.classList.remove('hidden');
+        unpricedText.textContent = `${unpricedItemsCount} item${unpricedItemsCount > 1 ? 's' : ''} unpriced ($0.00 assumed until set)`;
+      } else {
+        unpricedBanner.classList.add('hidden');
+      }
+
+      const remaining = state.budget - grandTotal;
+      const remainingBadge = document.getElementById('remaining-badge');
+      const bar = document.getElementById('budget-bar');
+      const progress = document.getElementById('budget-progress');
+
+      const pct = state.budget > 0 ? Math.min(100, (grandTotal / state.budget) * 100) : 100;
+      progress.style.width = `${pct}%`;
+
+      if (remaining < 0) {
+        bar.classList.remove('bg-emerald-600');
+        bar.classList.add('bg-rose-600');
+        remainingBadge.textContent = `$${Math.abs(remaining).toFixed(2)} over budget`;
+        remainingBadge.className = 'text-[11px] font-bold text-rose-100';
+      } else {
+        bar.classList.add('bg-emerald-600');
+        bar.classList.remove('bg-rose-600');
+        remainingBadge.textContent = `$${remaining.toFixed(2)} remaining`;
+        remainingBadge.className = 'text-[11px] font-semibold text-emerald-100';
+      }
+    }
+
+    function openPriceModal(item) {
+      activeModalItem = item;
+      const currentUnitPrice = getItemPrice(item);
+      const defaultPrice = getDefaultItemPrice(item);
+
+      document.getElementById('modal-store-label').textContent = `${state.storeName} Price`;
+      document.getElementById('modal-item-title').textContent = item.name;
+      document.getElementById('modal-default-price').textContent = defaultPrice !== null
+        ? `Est. ${state.storeName} default: $${defaultPrice.toFixed(2)}`
+        : 'No built-in estimate — enter your store price below';
+      document.getElementById('modal-price-input').value = currentUnitPrice !== null ? currentUnitPrice.toFixed(2) : '';
+
+      document.getElementById('price-modal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('modal-price-input').focus(), 50);
+    }
+
+    function closePriceModal() {
+      activeModalItem = null;
+      document.getElementById('price-modal').classList.add('hidden');
+    }
+
+    document.getElementById('price-modal-backdrop').addEventListener('click', closePriceModal);
+    document.getElementById('modal-cancel-btn').addEventListener('click', closePriceModal);
+
+    document.getElementById('modal-save-btn').addEventListener('click', () => {
+      if (!activeModalItem) return;
+      const raw = document.getElementById('modal-price-input').value.trim();
+      if (raw === '') {
+        delete state.priceOverrides[getStoreOverrideKey(activeModalItem.name)];
+        saveState();
+        render();
+        closePriceModal();
+        return;
+      }
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val >= 0) {
+        state.priceOverrides[getStoreOverrideKey(activeModalItem.name)] = +val.toFixed(2);
+        saveState();
+        render();
+      }
+      closePriceModal();
+    });
+
+    document.getElementById('modal-pantry-btn').addEventListener('click', () => {
+      if (!activeModalItem) return;
+      state.priceOverrides[getStoreOverrideKey(activeModalItem.name)] = 0;
+      saveState();
+      render();
+      closePriceModal();
+    });
+
+    document.getElementById('modal-reset-item-btn').addEventListener('click', () => {
+      if (!activeModalItem) return;
+      delete state.priceOverrides[getStoreOverrideKey(activeModalItem.name)];
+      saveState();
+      render();
+      closePriceModal();
+    });
+
+    document.getElementById('backup-btn').addEventListener('click', () => {
+      document.getElementById('import-json-input').value = '';
+      document.getElementById('backup-modal').classList.remove('hidden');
+    });
+    document.getElementById('backup-modal-backdrop').addEventListener('click', () => {
+      document.getElementById('backup-modal').classList.add('hidden');
+    });
+    document.getElementById('backup-close-btn').addEventListener('click', () => {
+      document.getElementById('backup-modal').classList.add('hidden');
+    });
+    document.getElementById('export-json-btn').addEventListener('click', () => {
+      const payload = JSON.stringify(state);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(payload).then(() => {
+          showToast('Backup code copied to clipboard!');
+        }).catch(() => {
+          document.getElementById('import-json-input').value = payload;
+          showToast('Copy the code shown in the box below.');
+        });
+      } else {
+        document.getElementById('import-json-input').value = payload;
+        showToast('Copy the code shown in the box below.');
+      }
+    });
+    document.getElementById('import-json-btn').addEventListener('click', () => {
+      const raw = document.getElementById('import-json-input').value.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.meals)) {
+          state = { ...state, ...parsed };
+          saveState();
+          render();
+          document.getElementById('backup-modal').classList.add('hidden');
+          showToast('Data restored successfully!');
+        } else {
+          showToast('Invalid backup code.');
+        }
+      } catch (e) {
+        showToast('Invalid backup code format.');
+      }
+    });
+
+    document.getElementById('store-select').addEventListener('change', (e) => {
+      state.multiplier = parseFloat(e.target.value);
+      state.storeName = e.target.options[e.target.selectedIndex].dataset.name;
+      saveState();
+      render();
+    });
+
+    document.getElementById('budget-input').addEventListener('input', (e) => {
+      state.budget = parseFloat(e.target.value) || 0;
+      saveState();
+      render();
+    });
+
+    document.querySelectorAll('.allergy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const allergy = btn.dataset.allergy;
+        if (state.allergies.includes(allergy)) {
+          state.allergies = state.allergies.filter(a => a !== allergy);
+        } else {
+          state.allergies.push(allergy);
+        }
+        saveState();
+        render();
+      });
+    });
+
+    document.getElementById('build-meal-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('new-meal-name');
+      if (!input.value.trim()) return;
+      createMealFromName(input.value);
+      input.value = '';
+    });
+
+    document.querySelectorAll('.quick-idea-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        createMealFromName(chip.dataset.idea);
+      });
+    });
+
+    document.getElementById('tab-all-meals').addEventListener('click', () => {
+      state.mealFilterTab = 'all';
+      render();
+    });
+
+    document.getElementById('tab-selected-meals').addEventListener('click', () => {
+      state.mealFilterTab = 'selected';
+      render();
+    });
+
+    document.getElementById('clear-meals-btn').addEventListener('click', () => {
+      state.selectedMealIds = [];
+      state.mealMultipliers = {};
+      state.qtyOverrides = {};
+      saveState();
+      render();
+    });
+
+    document.getElementById('auto-fill-btn').addEventListener('click', () => {
+      let currentTotal = parseFloat(document.getElementById('total-cost').textContent) || 0;
+      const candidates = state.meals.filter(m => !state.selectedMealIds.includes(m.id) && isMealSafe(m));
+      candidates.sort(() => Math.random() - 0.5);
+
+      let added = 0;
+      for (const meal of candidates) {
+        const cost = getMealCost(meal);
+        if (currentTotal + cost <= state.budget && cost > 0) {
+          state.selectedMealIds.push(meal.id);
+          state.expandedMealIds[meal.id] = true;
+          currentTotal += cost;
+          added++;
+        }
+      }
+      saveState();
+      render();
+      showToast(added > 0 ? `Added ${added} meal${added > 1 ? 's' : ''} within budget!` : 'Budget is full!');
+    });
+
+    const extraNameInput = document.getElementById('extra-item-name');
+    const extraAisleSelect = document.getElementById('extra-item-aisle');
+    const extraPriceInput = document.getElementById('extra-item-price');
+    const extraHint = document.getElementById('extra-item-hint');
+
+    extraNameInput.addEventListener('input', () => {
+      const val = extraNameInput.value.trim();
+      if (!val) {
+        extraPriceInput.placeholder = '?';
+        extraHint.classList.add('hidden');
+        return;
+      }
+      const match = lookupCatalogItem(val);
+      if (match) {
+        extraAisleSelect.value = match.aisle;
+        const est = (match.basePrice * state.multiplier).toFixed(2);
+        extraPriceInput.placeholder = `$${est}`;
+        extraHint.textContent = `Catalog match: ${match.aisle} • Est. $${est} at ${state.storeName}`;
+        extraHint.className = 'text-[11px] text-emerald-700 font-medium px-1';
+        extraHint.classList.remove('hidden');
+      } else {
+        extraPriceInput.placeholder = '?';
+        extraHint.textContent = 'Not in price catalog — enter a price or leave blank to set later';
+        extraHint.className = 'text-[11px] text-amber-700 font-medium px-1';
+        extraHint.classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('extra-item-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = extraNameInput.value.trim();
+      if (!name) return;
+
+      const match = lookupCatalogItem(name);
+      const rawPrice = parseFloat(extraPriceInput.value);
+      const hasManualPrice = !isNaN(rawPrice) && rawPrice >= 0;
+      const basePrice = hasManualPrice
+        ? +(rawPrice / state.multiplier).toFixed(2)
+        : (match ? match.basePrice : null);
+      const key = name.toLowerCase();
+
+      const existing = state.extraItems.find(item => item.name.trim().toLowerCase() === key);
+      if (existing) {
+        state.qtyOverrides[key] = (state.qtyOverrides[key] || 1) + 1;
+      } else {
+        state.extraItems.push({
+          name,
+          aisle: extraAisleSelect.value,
+          basePrice
+        });
+        if (hasManualPrice) {
+          state.priceOverrides[getStoreOverrideKey(name)] = +rawPrice.toFixed(2);
+        }
+      }
+
+      extraNameInput.value = '';
+      extraPriceInput.value = '';
+      extraPriceInput.placeholder = '?';
+      extraHint.classList.add('hidden');
+      saveState();
+      render();
+    });
+
+    document.getElementById('reset-prices-btn').addEventListener('click', () => {
+      state.priceOverrides = {};
+      state.qtyOverrides = {};
+      saveState();
+      render();
+      showToast('Prices & quantities reset');
+    });
+
+    document.getElementById('copy-list-btn').addEventListener('click', () => {
+      const selectedMeals = state.meals.filter(m => state.selectedMealIds.includes(m.id));
+      const itemMap = {};
+
+      selectedMeals.forEach(meal => {
+        const mult = getMealMultiplier(meal.id);
+        meal.ingredients.forEach(ing => {
+          const key = ing.name.trim().toLowerCase();
+          if (!itemMap[key]) itemMap[key] = { ...ing, baseCount: mult };
+          else itemMap[key].baseCount += mult;
+        });
+      });
+
+      state.extraItems.forEach(extra => {
+        const key = extra.name.trim().toLowerCase();
+        if (!itemMap[key]) itemMap[key] = { ...extra, baseCount: 1 };
+        else itemMap[key].baseCount += 1;
+      });
+
+      const items = Object.values(itemMap);
+      if (items.length === 0) {
+        showToast('Nothing on the list yet!');
+        return;
+      }
+
+      const grouped = {};
+      items.forEach(item => {
+        const key = item.name.trim().toLowerCase();
+        const qty = state.qtyOverrides[key] !== undefined ? state.qtyOverrides[key] : item.baseCount;
+        if (qty === 0) return;
+        const aisle = item.aisle || 'Household/Other';
+        if (!grouped[aisle]) grouped[aisle] = [];
+        const checked = state.checkedItems[key] ? '[x]' : '[ ]';
+        const unitP = getItemPrice(item);
+        const priceStr = unitP === null ? 'Set $' : `$${(unitP * qty).toFixed(2)}`;
+        grouped[aisle].push(`${checked} ${item.name}${qty > 1 ? ` (x${qty})` : ''} - ${priceStr}`);
+      });
+
+      let text = `SmartCart List (${state.storeName} - Est. $${document.getElementById('total-cost').textContent}):\n\n`;
+      AISLE_ORDER.forEach(aisle => {
+        if (grouped[aisle] && grouped[aisle].length > 0) {
+          text += `${aisle.toUpperCase()}\n${grouped[aisle].join('\n')}\n\n`;
+        }
+      });
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text.trim()).then(() => {
+          showToast('Shopping list copied!');
+        }).catch(() => {
+          showToast('Could not copy automatically.');
+        });
+      } else {
+        showToast('Clipboard not available in this viewer.');
+      }
+    });
+
+    populateDatalist();
+    render();
+  </script>
+</body>
+</html>
+
